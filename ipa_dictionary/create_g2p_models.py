@@ -14,7 +14,7 @@ class DefaultArgs:
         self.output_model_path = output_model_path
         self.temporary_directory = temporary_directory
         self.config_path = None
-        self.evaluate = True
+        self.evaluation_mode = True
         self.num_jobs = 10
         self.debug = True
         self.clean = True

@@ -1,8 +1,10 @@
 # coding=utf8
+import itertools
 import os
 import re
 from collections import Counter
-
+import hanziconv
+import hangul_jamo
 import jamo
 
 source_dir = r'D:\Data\speech\dictionaries\wikipron\raw'
@@ -11,9 +13,9 @@ os.makedirs(output_dir, exist_ok=True)
 
 lang_codes = ['bulgarian', 'croatian', 'czech', 'french', 'german', 'mandarin_hani', 'polish', 'portuguese_brazil',
               'portuguese_portugal', 'russian', 'spanish_castilian', 'spanish_latin_america', 'swedish',
-              'tamil', 'thai', 'turkish', 'ukrainian',
+              'tamil', 'thai', 'turkish', 'ukrainian', 'mandarin_hani_beijing', 'mandarin_hani_taiwan', 'mandarin_hani_standard',
               'korean_hangul', 'hausa', 'japanese', 'vietnamese_hanoi', 'vietnamese_hue', 'vietnamese_hochiminhcity']
-lang_codes = ['english_us', 'english_uk']
+lang_codes = ['russian']
 # lang_codes = ['hausa']
 
 bad_graphemes = {
@@ -25,13 +27,20 @@ bad_graphemes = {
                    'ș', 'ț', 'ʼ', 'ṭ', '₂', 'ã', 'å', 'û', 'ī', 'ž', '.'},
     'polish': {'+', '.', 'ü', 'ö', 'ø', 'ƶ', 'ñ', "ç", 'à', 'á', 'è', 'é', 'í'},
     'french': {'.', '/', 'º', 'å', 'æ', 'ÿ', 'ș'},
+    'japanese': {' ', '&', '+', '、', '〆', '〼', '〼', '＝', '𫡤', '・', '×', 'ゞ', 'ゟ', 'ゑ', 'ゐ', 'ヲ'},
+    'mandarin_hani_beijing': {'A', 'B', 'C', 'D', 'E', 'G', 'H', 'I', 'K', 'M', 'N', 'O', 'P', 'Q', 'S', 'T', 'U', 'V',
+                              'X', 'Y', 'Z', 'e', 'p', 'u', '·','α', 'β', 'γ', '…', '⿰', 'ㄅ', 'ㄆ', 'ㄇ', 'ㄈ', '𰚼', '𰯼', '𫇦',},
+    'mandarin_hani_taiwan': {'A', 'B', 'C', 'D', 'E', 'G', 'H', 'I', 'K', 'M', 'N', 'O', 'P', 'Q', 'S', 'T', 'U', 'V',
+                              'X', 'Y', 'Z', 'e', 'p', 'u', '·','α', 'β', 'γ', '…', '⿰', 'ㄅ', 'ㄆ', 'ㄇ', 'ㄈ', '𰚼', '𰯼', '𫇦',},
+    'mandarin_hani_standard': {'A', 'B', 'C', 'D', 'E', 'G', 'H', 'I', 'K', 'M', 'N', 'O', 'P', 'Q', 'S', 'T', 'U', 'V',
+                              'X', 'Y', 'Z', 'e', 'p', 'u', '·','α', 'β', 'γ', '…', '⿰', 'ㄅ', 'ㄆ', 'ㄇ', 'ㄈ', '𰚼', '𰯼', '𫇦',},
     'german': {"'", '.', '@', 'à', 'á', 'ç', 'è', 'é', 'ê', 'ó', 'ø', 'œ', 'í', 'ë'},
-    'portuguese_brazil': {"'", '.', 'ü', 'è'},
-    'portuguese_portugal': {"'", '.', 'ü', 'è'},
+    'portuguese_brazil': {"'", '.'},
+    'portuguese_portugal': {"'", '.'},
     'russian': {"'", '.', '/', 'ѳ'},
-    'spanish_castilian': {"'", '.', 'ö', 'ü', 'ꝇ', 'î', 'ç'},
-    'spanish_latin_america': {"'", '.', 'ö', 'ü', 'ꝇ', 'î', 'ç'},
-    'thai': {'…', "'", '.', '/'},
+    'spanish_castilian': {"'", '.', 'ö', 'ꝇ', 'î', 'ç'},
+    'spanish_latin_america': {"'", '.', 'ö', 'ꝇ', 'î', 'ç'},
+    'thai': {'…', "'", '/'},
     'turkish': {"̇", "'"},
     'tamil': {'ࢳ', 'ࢳ', 'ࢴ', 'ࢴ', 'ஃ'},
     'vietnamese_hanoi': {"'", '.', ',', },
@@ -69,9 +78,9 @@ def read_source(lang):
                             continue
                     graphemes.update(word)
                     phones.update(pronunciation_one)
-                    phones.update(pronunciation_two)
+                    #phones.update(pronunciation_two)
                     dictionary.append((word, pronunciation_one))
-                    dictionary.append((word, pronunciation_two))
+                    #dictionary.append((word, pronunciation_two))
                     continue
             elif lang == 'thai':
                 if not re.search('[˥˩˦˧˨]', line):
@@ -99,7 +108,9 @@ def read_source(lang):
                         dictionary.append((word, pronunciation_two))
                         break
                     continue
-            elif lang == 'mandarin_hani':
+            elif lang.startswith('mandarin_hani'):
+                if ' # ' in line:
+                    line = line.replace(' # ', ' ')
                 if '² ¹ ⁴ ⁻ ² ¹ ⁽ ⁴ ⁾' in line:
                     line = line.replace('² ¹ ⁴ ⁻ ² ¹ ⁽ ⁴ ⁾', '² ¹ ⁴')
                 if '² ¹ ⁴ ⁻ ² ¹ ¹' in line:
@@ -110,23 +121,34 @@ def read_source(lang):
                     line = line.replace('⁵ ¹ ⁻ ⁵ ³', '⁵ ¹')
                 if '⁵ ⁵ ⁻ ⁵ ¹' in line:
                     line = line.replace('⁵ ⁵ ⁻ ⁵ ¹', '⁵ ⁵')
-                skip_characters = ['² ⁴', 'ɚ', 'm̩', 'nʲ', 'v', '¹ ³', '¹ ¹', '⁴ ⁴', '² ⁴', '⁻', '⁽', '² ¹ ¹', '² ¹ ³', '⁵ ⁵ ³']
+                skip_characters = ['² ⁴', 'ɚ', 'm̩', 'nʲ', 'v', '¹ ³', '¹ ¹', '⁴ ⁴', '² ⁴', '⁽', '² ¹ ¹', '² ¹ ³', '⁵ ⁵ ³']
                 if any(x in line for x in skip_characters):
                     continue
                 if '⁻' in line:
                     line_one = re.sub(r' ⁻ [ ⁰¹²³⁴⁵]+', ' ', line)
+                    line_two = re.sub(r'[ ⁰¹²³⁴⁵]+ ⁻ ', ' ', line)
                     line_one = line_one.split()
+                    line_two = line_two.split()
                     word = line_one[0]
-                    if len(word) > 1:
+                    if lang in ['mandarin_hani_beijing', 'mandarin_hani_standard']:
+                        word = hanziconv.HanziConv.toSimplified(word)
+                    elif lang in ['mandarin_hani_taiwan']:
+                        word = hanziconv.HanziConv.toTraditional(word)
+                    if lang == 'mandarin_hani_standard' and word.endswith('儿'):
                         continue
+                    #if len(word) > 1:
+                    #    continue
                     pronunciation_one = line_one[1:]
+                    pronunciation_two = line_two[1:]
                     if lang in bad_graphemes:
                         if any(x in bad_graphemes[lang] for x in word):
                             print(word)
                             continue
                     graphemes.update(word)
                     phones.update(pronunciation_one)
+                    phones.update(pronunciation_two)
                     dictionary.append((word, pronunciation_one))
+                    dictionary.append((word, pronunciation_two))
                     continue
             if "\t" in line:
                 line = line.split("\t")
@@ -136,6 +158,12 @@ def read_source(lang):
                 line = line.split()
                 word = line[0]
                 pronunciation = line[1:]
+            if lang in ['mandarin_hani_beijing', 'mandarin_hani_standard']:
+                word = hanziconv.HanziConv.toSimplified(word)
+            elif lang in ['mandarin_hani_taiwan']:
+                word = hanziconv.HanziConv.toTraditional(word)
+            if lang == 'mandarin_hani_standard' and word.endswith('儿'):
+                continue
             if lang in bad_graphemes:
                 if any(x in bad_graphemes[lang] for x in word):
                     print(word)
@@ -147,7 +175,13 @@ def read_source(lang):
 
 
 bad_phones = {'english_uk': {'ɪː','aː', 'eː', 'a', 'o', 'oː', 'eː', 'e'},
-              'english_us': {'ɒ', 'aː', 'a', 'o', 'oː', 'eː', 'e', 'ɪː', 'ɛː'}}
+              'english_us': {'ɒ', 'aː', 'a', 'o', 'oː', 'eː', 'e', 'ɪː', 'ɛː'},
+
+              'german': {'ʊɪ'},
+              'mandarin_hani_taiwan': {'ai', 'a', 'ei', 'o', 'ə', 'z̩', 'ʐ̩'},
+              'mandarin_hani_standard': {'ai', 'a', 'ei', 'o', 'ə', 'z̩', 'ʐ̩'},
+              'mandarin_hani_beijing': {'ai', 'a', 'ei', 'o', 'ə',  'z̩', 'ʐ̩'},
+              }
 
 vowels = {
     'english_us': {'aɪ', 'aʊ', 'eɪ', 'i', 'iː', 'oɪ', 'oʊ', 'u', 'uː', 'æ',  'ɑ', 'ɑː', 'ɔ', 'ɔɪ', 'ɔː', 'ə', 'ɚ', 'ɛ', 'ɝ', 'ɝː', 'ɪ',  'ʊ', 'ʌ',},
@@ -156,13 +190,20 @@ vowels = {
     'vietnamese_hue': {'a', 'aː', 'e', 'i', 'o', 'u', 'ɔ', 'ə', 'əː', 'ɛ', 'ɨ', 'ʊ', 'ɪ'},
     'vietnamese_hochiminhcity': {'a', 'aː', 'e', 'i', 'o', 'u', 'ɔ', 'ə', 'əː', 'ɛ', 'ɨ', 'ʊ', 'ɪ'},
     'mandarin_hani': {'a', 'e', 'o', 'i', 'u', 'y', 'ə', 'ɚ', 'ɤ̃', 'ʊ̃'},
-    'thai': {'a', 'aj', 'aw', 'aː', 'aːj', 'aːw', 'e', 'ew', 'eː', 'eːw', 'i', 'iː', 'o', 'oː', 'oːj', 'u', 'uj',
-                  'uə', 'uː', 'uːj', 'uːə', 'à', 'áː', 'ì', 'ǎː', 'ɔ', 'ɔj', 'ɔː', 'ɔːj', 'ɔ̌', 'ɛ', 'ɛw', 'ɛː', 'ɛːw',
-                  'ɤ', 'ɤj', 'ɤː', 'ɤːj', 'ɯ', 'ɯː'},
+    'mandarin_hani_standard': {'a', 'e', 'o', 'i', 'u', 'y', 'ə', 'ɚ', 'ɤ̃', 'ʊ̃'},
+    'mandarin_hani_taiwan': {'a', 'e', 'o', 'i', 'u', 'y', 'ə', 'ɚ', 'ɤ̃', 'ʊ̃'},
+    'mandarin_hani_beijing': {'a', 'e', 'o', 'i', 'u', 'y', 'ə', 'ɚ', 'ɤ̃', 'ʊ̃'},
+    'thai': {'a', 'aː','e', 'eː', 'i', 'iː', 'o', 'oː', 'u',
+                  'ə', 'uː', 'ɔ', 'ɔː', 'ɛ', 'ɛː',
+                  'ɤ', 'ɤː', 'ɯ', 'ɯː'},
     'swedish': {'a', 'aʊ', 'aː', 'e', 'eː', 'i', 'iː', 'o', 'oː', 'u', 'uː', 'y', 'yʷ', 'yː', 'æ', 'æː', 'êː', 'ø',
                   'øː', 'ø̀ː', 'œ', 'œː', 'œ̞', 'œ̞ː', 'ɑ', 'ɑː', 'ɒː', 'ɒ̀ː', 'ɔ', 'ə', 'ɚ', 'ɛ', 'ɛɵ', 'ɛː', 'ɛ̂',
                   'ɛ̄', 'ɜ', 'ɝ', 'ɪ', 'ɵ', 'ɵː', 'ɵ̄', 'ɶ', 'ɶː', 'ʉ', 'ʉː', 'ʉ̂ː', 'ʉ̟ː', 'ʊ', 'ʊː', 'ʏ', 'ỳː', 'ỵː'},
           }
+
+vowel_patterns = {
+    'swedish': re.compile(r'^[aeiɛøæuoʊêɔɪœɑʉɵɶ̂œ̞ː˧˩ɒyʏʉ̟ː˧˩əː˧˩˥]+$')
+}
 
 def add_variation(word, phones, lang):
     variations = [(word, phones)]
@@ -176,8 +217,6 @@ def add_variation(word, phones, lang):
         for i, p in enumerate(phones):
             if p == 't' and 1 < i < len(phones) - 1 and phones[i-1] in vowels[lang] and phones[i + 1] in {'n̩', 'm̩', 'l̩', 'ɚ', 'ə', 'ɫ̩'}:
                 prons.append([x if j != i else 'ʔ' for j, x in enumerate(phones)])
-        if len(phones) > 1 and phones[-1] == 't' and phones[-2] in vowels[lang]:
-            prons.append(phones[:-1] + ['ʔ'])
         for new_pron in prons:
             if new_pron == phones:
                 continue
@@ -192,8 +231,6 @@ def add_variation(word, phones, lang):
             if p == 'ə' and 1 < i < len(phones) - 2 and phones[i+1] in {'l', 'ɹ'} and phones[i+2] == 'ə': # Variable schwa deletion
                 prons.append([x for j, x in enumerate(phones) if j != i])
 
-        if len(phones) > 1 and phones[-1] == 't' and phones[-2] in vowels[lang]:
-            prons.append(phones[:-1] + ['ʔ'])
         for new_pron in prons:
             if new_pron == phones:
                 continue
@@ -205,7 +242,6 @@ def save_dictionary(dictionary, lang):
     deduplication = set()
     final_phones = Counter()
     if lang == 'korean_hangul':
-        from jamo import h2j
         path = os.path.join(output_dir, 'korean_jamo.txt'.format(lang))
         with open(path, 'w', encoding='utf8') as f:
             for w, p in dictionary:
@@ -213,12 +249,14 @@ def save_dictionary(dictionary, lang):
                 p = ' '.join(p)
                 if (w, p) in deduplication:
                     continue
-                f.write('{}\t{}\n'.format(h2j(w), p))
-
+                f.write('{}\t{}\n'.format(hangul_jamo.decompose(w), p))
+        dictionary =[(hangul_jamo.compose(hangul_jamo.decompose(w)), p) for w, p in dictionary]
     path = os.path.join(output_dir, '{}.txt'.format(lang))
     with open(path, 'w', encoding='utf8') as f:
         for w, p in sorted(dictionary):
             for w, p in add_variation(w, p, lang):
+                if p[-1] == 'ʔ' and (w, p[:-1] + ['t']) in dictionary:
+                    continue
                 final_phones.update(p)
                 p = ' '.join(p)
                 if (w, p) in deduplication:
@@ -234,14 +272,34 @@ lang_mapping = {
         'd̪': 'd',
         't̪': 't',
         'ɐ': 'a',
+        'æ': 'a',
+        'a̟': 'a',
+        'e': 'ɛ',
         'ə': 'ɤ',
         'o̝': 'ɔ',
-        'lʲ': 'ɫ',
-        'ɱ': 'mʲ',
+        'o̟': 'ɔ',
+        'u̟': 'u',
+        'ʉ': 'u',
+        'ʊ': 'u',
+        'ɤ̞': 'ɤ',
+        'ɤ̟': 'ɤ',
+        'lʲ': 'ʎ',
+        'l': 'ɫ',
         'ɾ': 'r',
+        'iː': 'i j',
+        's̪': 's',
+        'n̪': 'n',
+        'ɾʲ': 'rʲ',
+        'nʲ': 'ɲ',
+        'ɡʲ': 'ɟ',
+        'kʲ': 'c',
+    },
+    'russian': {
     },
     'croatian': {
-        'v': 'ʋ',
+        #'v': 'ʋ',
+        'ʃ': 'ʂ',
+        'ʒ': 'ʐ',
         'ô': 'o˦˨',
         'ôː': 'oː˦˨',
         'ûː': 'uː˦˨',
@@ -268,7 +326,8 @@ lang_mapping = {
         'ǔ': 'u˨˦',
     },
     'french': {
-        'r': 'ʁ'
+        'r': 'ʁ',
+        'œ̃': 'ɛ̃'
     },
     'vietnamese_hanoi': {
         'k̟̚': 'k̚',
@@ -276,12 +335,9 @@ lang_mapping = {
         'ï': 'ɨ',
     },
     'german': {
-        'b̥': 'p',
-        'pʰ': 'p',
-        'kʰ': 'k',
-        'd̥': 't',
-        'tʰ': 't',
-        'ɡ̊': 'k',
+        'b̥': 'b',
+        'd̥': 'd',
+        'ɡ̊': 'ɡ',
         'r': 'ʁ',
         'ŋ̍': 'n̩',
         'ɱ̩': 'n̩',
@@ -290,8 +346,97 @@ lang_mapping = {
         'χ': 'x',
         'ʋ': 'v',
         'ɘ': 'ə',
+        'i': 'ɪ',
+        'ø': 'øː',
+        'o': 'ɔ',
+        'u': 'ʊ',
+        'œː': 'øː',
+        'y': 'ʏ',
+        'e': 'ɛ',
+        'ɛː': 'eː',
+        'ɔː': 'oː',
+        'ɑː': 'aː',
+        'ɒː': 'aː',
     },
     'mandarin_hani': {
+        'b̥': 'p',
+        'd̥': 't',
+        'g̊': 'k',
+        'ɡ̊': 'k',
+        'ɖʐ̥': 'ʈʂ',
+        'dz̥': 'ts',
+        'dʑ̥': 'tɕ',
+        'ä': 'a',
+        'æ̃': 'a',
+        'ɤ': 'o',
+        'ɤ̃': 'o',
+        'ʊ̃': 'o',
+        'ɪ': 'i',
+        'ɻʷ': 'ɻ',
+        'ʊ': 'u',
+        'ɛ': 'e',
+        'ɑ': 'a',
+        'ɑ̃': 'a',
+        'ɔ': 'o',
+        'ɔː': 'o',
+        '⁵⁵': '˥',
+        '⁵¹': '˥˩',
+        '³⁵': '˧˥',
+        '²¹⁴': '˨˩˦',
+    },
+    'mandarin_hani_taiwan': {
+        'b̥': 'p',
+        'd̥': 't',
+        'g̊': 'k',
+        'ɡ̊': 'k',
+        'ɖʐ̥': 'ʈʂ',
+        'dz̥': 'ts',
+        'dʑ̥': 'tɕ',
+        'ä': 'a',
+        'æ̃': 'a',
+        'ɤ': 'o',
+        'ɤ̃': 'o',
+        'ʊ̃': 'o',
+        'ɪ': 'i',
+        'ɻʷ': 'ɻ',
+        'ʊ': 'u',
+        'ɛ': 'e',
+        'ɑ': 'a',
+        'ɑ̃': 'a',
+        'ɔ': 'o',
+        'ɔː': 'o',
+        '⁵⁵': '˥',
+        '⁵¹': '˥˩',
+        '³⁵': '˧˥',
+        '²¹⁴': '˨˩˦',
+    },
+    'mandarin_hani_beijing': {
+        'b̥': 'p',
+        'd̥': 't',
+        'g̊': 'k',
+        'ɡ̊': 'k',
+        'ɖʐ̥': 'ʈʂ',
+        'dz̥': 'ts',
+        'dʑ̥': 'tɕ',
+        'ä': 'a',
+        'æ̃': 'a',
+        'ɤ': 'o',
+        'ɤ̃': 'o',
+        'ʊ̃': 'o',
+        'ɪ': 'i',
+        'ɻʷ': 'ɻ',
+        'ʊ': 'u',
+        'ɛ': 'e',
+        'ɑ': 'a',
+        'ɑ̃': 'a',
+        'ɔ': 'o',
+        'ɔː': 'o',
+        '⁵⁵': '˥',
+        '⁵¹': '˥˩',
+        '³⁵': '˧˥',
+        '²¹⁴': '˨˩˦',
+    },
+    'mandarin_hani_standard': {
         'b̥': 'p',
         'd̥': 't',
         'g̊': 'k',
@@ -353,40 +498,58 @@ lang_mapping = {
     'swedish': {
         'ɛ̄': 'ɛ̂',
         'ɵ̄': 'ɵ̂',
+        'ɘ': 'ɵ',
+        'ə': 'ɛ',
         'ʁ': 'r',
         'ɾ': 'r',
         'ɹ': 'r',
         'v': 'ʋ',
+        'w': 'ʋ',
+        'ɜ': 'ɛ',
+        'æː': 'ɛː',
+        'ø': 'øː',
+        'æ': 'ɛ',
         'ˇl': 'l',
         'yʷ': 'y',
-        'œ̞ː': 'œː',
+        'œ̞ː': 'øː',
+        'œː': 'øː',
         'œ̞': 'œ',
         'ç': 'ɕ',
         'bː': 'b',  # removing length in consonants
         'ɖː': 'ɖ',
         'ɖˑ': 'ɖ',
+        'ˈt': 'tʰ',
+        'ˈk': 'kʰ',
+        'ˈp': 'pʰ',
         'dː': 'd',
         'jː': 'j',
-        'kː': 'k',
+        'kː': 'kʰ',
         'lː': 'l',
         'mː': 'm',
         'nː': 'n',
         'fː': 'f',
-        'pː': 'p',
+        'ɧː': 'ɧ',
+        'pː': 'pʰ',
         'rː': 'r',
         'sː': 's',
         'tˑ': 't',
-        'tː': 't',
+        'tʰː': 'tʰ',
+        'pʰː': 'pʰ',
+        'kʰː': 'kʰ',
+        'tː': 'tʰ',
         'ŋː': 'ŋ',
+        'ɲ': 'ɳ',
         'ɕː': 'ɕ',
         'ɡː': 'ɡ',
-        'ʈː': 'ʈ',
+        'ʈː': 'ʈʰ',
+        'ʈʰː': 'ʈʰ',
         'ʂː': 'ʈ',
         'ỵː': 'yː',
         'ʉ̟̂': 'ʉ̂',
         'ʉ̟ː': 'ʉː',
         'ʉ̂': 'ʉ̂ː',
         'ɒː': 'ɑː',
+        'aː': 'ɑː',
         'ɑ': 'ɑː',
         'e': 'eː',
         'o': 'oː',
@@ -396,6 +559,7 @@ lang_mapping = {
         'ɒ̀ː': 'ɑ̀ː',
         'ʊː': 'ʊ',
         'ʉ': 'ʉː',
+        'ɵː': 'uː',
         'ɶː': 'øː',
     },
     'tamil': {
@@ -420,21 +584,67 @@ lang_mapping = {
     },
     'ukrainian': {
         'ɫ': 'l',
+        'ʍ': 'ʋ',
+        'w': 'ʋ',
+        'v': 'ʋ',
+        #'e': 'ɛ',
+        #'o': 'ɔ',
         'ɫː': 'lː',
     },
     'japanese': {
         'o̞': 'o',
+        'n̩': 'n',
+        'ä': 'a',
+        'ɡ̊': 'ɡ',
+        'ḁ': 'a',
+        'ẽ': 'e',
+        'm̩ː': 'mː',
+        'e̥': 'e',
+        'u͍': 'ɯ',
+        'ɯ̃ᵝ': 'ɯ',
+        'u͍ː': 'ɯː',
+        'w͍': 'w',
+        'y': 'j',
+        'r': 'ɾ',
+        'ɽ': 'ɾ',
+        'ɾ̥': 'ɾ',
+        'ɯᵝ': 'ɯ',
+        'ɯᵝː': 'ɯː',
+        'ɯ̟̃ᵝː': 'ɯː',
+        'ɯ̥ᵝ': 'ɯ̥',
+        'ʲkʲ': 'kʲ',
+        'nʲ': 'ɲ',
+        'tɕʲ': 'tɕ',
+        'ɕʲ': 'ɕ',
+        'ĩː': 'iː',
+        'õ̞ː': 'oː',
+        'i̥̥': 'i̥',
+        'e̞̊': 'e',
+        'ẽ̞ː': 'eː',
+        'ã̠ː': 'aː',
         'õ̞': 'o',
+        'd̥': 'd',
+        'b̥': 'b',
         'o̞ː': 'oː',
         'e̞ː': 'eː',
         'e̞': 'e',
         'ẽ̞': 'e',
         'ĩ': 'i',
+        'ɸ̥': 'ɸ',
+        'ɨ̃ᵝː': 'ɨː',
+        'ĩ̥': 'i',
         'a̠ː': 'aː',
         'a̠': 'a',
+        'o̞̊': 'o',
+        'dʑʲ': 'dʑ',
+        'ɾ̠': 'ɾ',
         'ã̠': 'a',
+        'õ̥': 'o',
+        'dʲ': 'dʑ',
+        'tʲ': 'tɕ',
         # 'ɯ̟ᵝ': 'ɯ',
         'ɰᵝ': 'w',
+        'ɰᵝː': 'wː',
         # 'ɯ̟̊ᵝ': 'ɨ̥',
         # 'ɯ̟ᵝː': 'ɨː',
         # 'ɯ̟̃ᵝ': 'ɨ',
@@ -442,6 +652,7 @@ lang_mapping = {
         # 'ɨᵝ': 'ɨ',
         # 'ɨ̃ᵝ': 'ɨ',
         # 'ɨᵝː': 'ɨː',
+        'ɯ̟̊': 'ɯ̥',
         'ɲ̟': 'ɲ',
         'ŋʲ': 'ɲ',
         'p̚ʲ': 'p̚',
@@ -450,12 +661,16 @@ lang_mapping = {
     },
     'turkish': {
         'ɑ': 'a',
-        'ɑː': 'aː',
+        'ɑː': 'a',
+        'aː': 'a',
+        'iː': 'i',
+        'uː': 'u',
         'ɛ': 'e',
         'e̞': 'e',
         'ɔ': 'o',
         'ʊ': 'u',
         'ʏ': 'y',
+        'β': 'v',
         'o̞': 'o',
         'ɪ': 'i',
         'ø': 'œ',
@@ -502,11 +717,17 @@ def convert_language_specific(word, phones, lang):
     new_pron = []
     if lang == 'swedish':
         for i, p in enumerate(phones):
+            for k, v in lang_mapping[lang].items():
+                if p == k:
+                    phones[i] = v
+                    break
+
+        for i, p in enumerate(phones):
             if p == '¹':
                 found_first = False
                 found_second = False
                 for j in range(i + 1, len(phones)):
-                    if phones[j] in vowels[lang]:
+                    if vowel_patterns[lang].match(phones[j]):
                         if not found_first:
                             phones[j] += '˥˧'  # Falling tone
                             found_first = True
@@ -661,6 +882,10 @@ def convert_language_specific(word, phones, lang):
             elif p == 'ʒ' and len(new_pron) and new_pron[-1] == 'd':
                 new_pron[-1] = 'dʒ'
                 continue
+            elif p in {'ɡ', 'k'} and len(new_pron) and new_pron[-1] in {'n'}:
+                new_pron[-1] = 'ŋ'
+            elif p in {'v', 'f'} and len(new_pron) and new_pron[-1] in {'n'}:
+                new_pron[-1] = 'ɱ'
         elif lang == 'czech':
             if p == 'ɫ':
                 p = 'l'  # just use light l
@@ -673,13 +898,13 @@ def convert_language_specific(word, phones, lang):
             elif p == 'ɔː':  # Standard variety version
                 p = 'oː'
             elif p in {'u', 'ʊ'} and len(new_pron) and new_pron[-1] in {'o', 'ɔ'}:
-                new_pron[-1] = 'ou'
+                new_pron[-1] = 'oʊ'
                 continue
             elif p in ['u', 'ʊ'] and len(new_pron) and new_pron[-1] in {'a'}:
-                new_pron[-1] = 'au'
+                new_pron[-1] = 'aʊ'
                 continue
             elif p in {'u', 'ʊ'} and len(new_pron) and new_pron[-1] in {'e', 'ɛ'}:
-                new_pron[-1] = 'au'
+                new_pron[-1] = 'eʊ'
                 continue
             elif p in {'ʃ', 's'} and len(new_pron) and new_pron[-1] in {'t'}:
                 new_pron[-1] += p
@@ -692,13 +917,18 @@ def convert_language_specific(word, phones, lang):
             elif p == 'e':
                 p = 'ɛ'
         elif lang == 'croatian':
-            if p == 'ɕ' and len(new_pron) and new_pron[-1] == 't':
-                new_pron[-1] = 'tɕ'
+            if p in {'ɕ', 'ʂ'} and len(new_pron) and new_pron[-1] == 't':
+                new_pron[-1] += p
                 continue
-            elif p == 'ʑ' and len(new_pron) and new_pron[-1] == 'd':
-                new_pron[-1] = 'dʑ'
+            elif p in {'ʑ', 'ʐ'} and len(new_pron) and new_pron[-1] == 'd':
+                new_pron[-1] += p
                 continue
         elif lang == 'german':
+            if lang in lang_mapping:
+                for k, v in lang_mapping[lang].items():
+                    if p == k:
+                        p = v
+                        break
             if p in {'ʏ', 'ɪ'} and len(new_pron) and new_pron[-1] in {'o', 'ɔ'}:
                 new_pron[-1] = 'ɔʏ'
                 continue
@@ -714,19 +944,32 @@ def convert_language_specific(word, phones, lang):
             elif p == 'e' and len(new_pron) and new_pron[-1] == 'ɐ':
                 new_pron[-1] = 'ɐ'
                 continue
+            elif p == 'ʔ':
+                continue
+            elif p in {'tʰ', 'kʰ', 'pʰ'} and i == len(phones) - 1:
+                p = p[0]
+            elif p in {'tʰ', 'kʰ', 'pʰ'}  and len(new_pron) and new_pron[-1] in {'s', 'ts', 'ʃ', 'tʃ'}:
+                p = p[0]
+            elif p in {'t', 'k', 'p'} and i == 0:
+                p += 'ʰ'
+            elif p in {'s', 'ʃ'} and i == 1 and new_pron[-1] in {'tʰ'}:
+                new_pron[-1] = "t" + p
+                continue
+            elif p in {'v', 's', 'x', 'ʁ', 'l', 'j'} and len(new_pron) and new_pron[-1] in {'tʰ', 'kʰ', 'pʰ'}:
+                new_pron[-1] = new_pron[-1][0]
             elif p == 's' and len(new_pron) and new_pron[-1] == 't':
                 if 'z' in word or 'c' in word:
                     new_pron[-1] = 'ts'
                     continue
             elif p == 'õ':
-                new_pron.append('o')
+                new_pron.append('ɔ')
                 new_pron.append('n')
                 continue
             elif p == 'ɛ̃':
                 new_pron.append('eː')
                 new_pron.append('n')
                 continue
-        elif lang == 'mandarin_hani':
+        elif lang.startswith('mandarin_hani'):
             vowel_pattern = re.compile(r'^[ayeiouəɚʊɤ̃]+[²³⁰¹⁴⁵]*$')
             for k, v in lang_mapping[lang].items():
                 if p == k:
@@ -790,12 +1033,48 @@ def convert_language_specific(word, phones, lang):
             if p == 'ʒ' and len(new_pron) and new_pron[-1] == 'd':
                 new_pron[-1] += p
                 continue
+            elif p in {'k', 'kʰ', 'ɡ'} and len(new_pron) and new_pron[-1] in {'m', 'n', 'ɳ', 'ɲ', 'ŋ'}:
+                new_pron[-1] = 'ŋ'
+            elif p in {'t', 'tʰ', 'd'} and len(new_pron) and new_pron[-1] in {'m', 'n', 'ɳ', 'ɲ', 'ŋ'}:
+                new_pron[-1] = 'n'
+            elif p in {'p', 'pʰ', 'b'} and len(new_pron) and new_pron[-1] in {'m', 'n', 'ɳ', 'ɲ', 'ŋ'}:
+                new_pron[-1] = 'm'
+            elif p in {'ʈ', 'ʈʰ', 'ɖ', 'ʂ'} and len(new_pron) and new_pron[-1] in {'m', 'n', 'ɳ', 'ɲ', 'ŋ'}:
+                new_pron[-1] = 'ɳ'
+            elif p == 's' and len(new_pron) and new_pron[-1] == 'r' and 'rr' not in word:
+                new_pron[-1] = 'ʂ'
+                continue
+            elif p in {'t', 'ʈ'} and len(new_pron) and new_pron[-1] == 'r' and 'rr' not in word:
+                new_pron[-1] = 'ʈ'
+                continue
+            elif p in {'d', 'ɖ'} and len(new_pron) and new_pron[-1] == 'r' and 'rr' not in word:
+                new_pron[-1] = 'ɖ'
+                continue
+            elif p in {'n', 'ɳ'} == 'n' and len(new_pron) and new_pron[-1] == 'r' and 'rr' not in word:
+                new_pron[-1] = 'ɳ'
+                continue
+            elif p in {'l', 'ɭ'} and len(new_pron) and new_pron[-1] == 'r' and 'rr' not in word:
+                new_pron[-1] = 'ɭ'
+                continue
+            elif p in {'tʰ', 'ʈʰ'} and len(new_pron) and new_pron[-1] == 'r' and 'rr' not in word:
+                new_pron[-1] = 'ʈʰ'
+                continue
+            elif p in {'s', 'ʂ'} and len(new_pron) and new_pron[-1] == 'r' and 'rr' not in word:
+                new_pron[-1] = 'ʂ'
+                continue
             elif p == 'aʊ':
                 new_pron.append('a')
                 new_pron.append('ʊ')
                 continue
             elif p in {'r', 'n', 'l', 't', 'k', 'ɡ'} and len(new_pron) and new_pron[-1] == 'ə':
                 new_pron[-1] = 'ɛ'
+            elif p in {'t', 'k', 'p', 'ʈ'} and not len(new_pron):
+                p += 'ʰ'
+            elif not vowel_patterns[lang].match(p) and len(new_pron) and new_pron[-1] in {'tʰ', 'kʰ', 'pʰ', 'ʈʰ'}:
+                print(new_pron[-1], p)
+                new_pron[-1] = new_pron[-1][0]
+            elif p in {'tʰ', 'kʰ', 'pʰ', 'ʈʰ'} and len(new_pron) and (new_pron[-1] in {'ʂ', 's'} or i == len(phones) - 1):
+                p = p[0]
             elif p == 'ə' and i == len(phones) - 1:
                 p = 'e'
             elif p in {'r'} and len(new_pron) and new_pron[-1] == 'ɜ':
@@ -814,16 +1093,7 @@ def convert_language_specific(word, phones, lang):
             elif p in {'β', 'b', 'p', } and len(new_pron) and new_pron[-1] == 'n':
                 new_pron[-1] = 'm'
         elif lang == 'thai':
-            if p in {'j', 'w'} and len(new_pron) and new_pron[-1] in {'a', 'aː'}:
-                new_pron[-1] += p
-                continue
             if p in {'a'} and len(new_pron) and new_pron[-1] in {'i', 'iː', 'ɯ', 'ɯː', 'u', 'uː'}:
-                new_pron[-1] += p
-                continue
-            if p in {'w'} and len(new_pron) and new_pron[-1] in {'e', 'eː', 'ɛ', 'ɛː', 'ia'}:
-                new_pron[-1] += p
-                continue
-            if p in {'j'} and len(new_pron) and new_pron[-1] in {'ɤ', 'ɤː', 'o', 'oː', 'ɔ', 'ɔː', 'ɯa', 'ua'}:
                 new_pron[-1] += p
                 continue
         elif lang == 'turkish':
@@ -833,6 +1103,14 @@ def convert_language_specific(word, phones, lang):
             elif p == 'ʒ' and len(new_pron) and new_pron[-1] in {'d'}:
                 new_pron[-1] += p
                 continue
+            elif p in {'e', 'i', 'œ','y'} and len(new_pron) and new_pron[-1] in {'k'}:
+                new_pron[-1] = 'c'
+            elif p in {'e', 'i', 'œ','y'} and len(new_pron) and new_pron[-1] in {'ɡ'}:
+                new_pron[-1] = 'ɟ'
+            elif p in {'a', 'ɯ', 'o','u'} and len(new_pron) and new_pron[-1] in {'l'}:
+                new_pron[-1] = 'ɫ'
+            elif p in {'i', 'e', 'œ','y'} and len(new_pron) and new_pron[-1] in {'ɫ'}:
+                new_pron[-1] = 'l'
         elif lang == 'portuguese_brazil':
             if p == 'ʃ' and len(new_pron) and new_pron[-1] in {'t'}:
                 new_pron[-1] += p
@@ -840,21 +1118,58 @@ def convert_language_specific(word, phones, lang):
             elif p == 'ʒ' and len(new_pron) and new_pron[-1] in {'d'}:
                 new_pron[-1] += p
                 continue
+        elif lang == 'russian':
+            voiced_set = {'v', 'bʲ', 'b', 'bː', 'd', 'dz', 'dzʲ', 'dʐ', 'dʲ', 'dʲː', 'dː',
+                     'v', 'vʲ', 'vʲː', 'vː', 'z', 'zʲ', 'zʲː', 'zː', 'ɡ', 'ɡʲ', 'ɡː',
+                     'ɣ', 'ʐ', 'ʐː', 'ʑː'}
+            if p in {'ʔ'}:
+                continue
+
         elif lang == 'japanese':
             for k, v in lang_mapping[lang].items():
                 if p == k:
                     p = v
                     break
-            if p in {'p', 'pʲ'} and len(new_pron) and new_pron[-1] in {'p̚'}:
+            if p in {'.', '˕', '}', '˦˨˦', '˥',  '˨˩','˧','꜔', '˩', 'ʔ', '%', '˩˥'}:
+                continue
+            elif p in {'̥', '̥̥',} and len(new_pron):
+                new_pron[-1] += '̥'
+                continue
+            elif p in {'ᵝ̥'} and len(new_pron):
+                if '̥' not in new_pron[-1] and 'ː' not in new_pron[-1]:
+                    new_pron[-1] += '̥'
+                continue
+            elif p in {'ː̥'} and len(new_pron):
+                new_pron[-1] += 'ː'
+                continue
+            elif p in {'j'} and len(new_pron) and new_pron[-1] in {'ɾ','p','m','b','k','t','d', 'ç', 'ɡ'}:
+                new_pron[-1] += 'ʲ'
+                continue
+            elif p in {'h'} and len(new_pron) and new_pron[-1] in {'c'}:
+                new_pron[-1] = 'tɕ'
+                continue
+            elif p in {'p', 'pʲ'} and len(new_pron) and new_pron[-1] in {'p̚'}:
+                new_pron[-1] = p + 'ː'
+                continue
+            elif p in {'b'} and len(new_pron) and new_pron[-1] in {'b̚'}:
+                new_pron[-1] = p + 'ː'
+                continue
+            elif p in {'ɾ', 'ɾʲ'} and len(new_pron) and new_pron[-1] in {'ɾ̚'}:
                 new_pron[-1] = p + 'ː'
                 continue
             elif p in {'k', 'kʲ'} and len(new_pron) and new_pron[-1] in {'k̚'}:
                 new_pron[-1] = p + 'ː'
                 continue
-            elif p in {'t', 'tʲ'} and len(new_pron) and new_pron[-1] in {'t̚'}:
+            elif p in {'t', 'tʲ'} and len(new_pron) and new_pron[-1] in {'ʔ̥', 't̚'}:
                 new_pron[-1] = p + 'ː'
                 continue
             elif p in {'tɕ', 'ts'} and len(new_pron) and new_pron[-1] in {'t̚'}:
+                new_pron[-1] = p + 'ː'
+                continue
+            elif p in {'ɡ'} and len(new_pron) and new_pron[-1] in {'ɡ̚'}:
+                new_pron[-1] = p + 'ː'
+                continue
+            elif p in {'d', 'dz', 'ʑ', 'dʑ'} and len(new_pron) and new_pron[-1] in {'d̚'}:
                 new_pron[-1] = p + 'ː'
                 continue
             elif p in {'i', 'iː', 'i̥'} and len(new_pron) and 'ʲ' in new_pron[-1]:
@@ -892,19 +1207,19 @@ def convert_language_specific(word, phones, lang):
                 if p == k:
                     p = v
                     break
-            if p in {'e', 'ɛː', 'ɛ', 'a', 'o', 'u', 'ʌ'} and len(new_pron) and new_pron[-1] in {'j'}:
-                new_pron[-1] += p
-                continue
-            elif p in {'i'} and len(new_pron) and new_pron[-1] in {'w', 'ɥ'}:
-                new_pron[-1] = 'ɥi'
-                continue
-            elif p in {'e', 'ɛː', 'ɛ', 'a', 'o', 'i', 'ʌ'} and len(new_pron) and new_pron[-1] in {'w'}:
-                new_pron[-1] += p
-                continue
-            elif p in {'i'} and len(new_pron) and new_pron[-1] in {'ɰ'}:
-                new_pron[-1] += p
-                continue
-            elif p == 't͈' and 'ᄄ' not in jamo.h2j(word):
+            #if p in {'e', 'ɛː', 'ɛ', 'a', 'o', 'u', 'ʌ'} and len(new_pron) and new_pron[-1] in {'j'}:
+            #    new_pron[-1] += p
+            #    continue
+            #elif p in {'i'} and len(new_pron) and new_pron[-1] in {'w', 'ɥ'}:
+            #    new_pron[-1] = 'ɥi'
+            #    continue
+            #elif p in {'e', 'ɛː', 'ɛ', 'a', 'o', 'i', 'ʌ'} and len(new_pron) and new_pron[-1] in {'w'}:
+            #    new_pron[-1] += p
+            #    continue
+            #elif p in {'i'} and len(new_pron) and new_pron[-1] in {'ɰ'}:
+            #    new_pron[-1] += p
+            #    continue
+            if p == 't͈' and 'ᄄ' not in jamo.h2j(word):
                 if len(new_pron) and '̚' in new_pron[-1]:
                     p = 'tʰ'
                 else:
@@ -929,11 +1244,24 @@ def convert_language_specific(word, phones, lang):
                     p = 'sʰ'
                 else:
                     p = 's'
+            elif p == 'x' and len(new_pron) and new_pron[-1] == 'k':
+                new_pron[-1] += 'ʰ'
+                continue
 
         elif lang in ['vietnamese_hanoi', 'vietnamese_hue', 'vietnamese_hochiminhcity']:
             vowel_pattern = re.compile(rf'^[{"".join(vowels[lang])}]+$')
+            tone_pattern = re.compile(r'^[˥˩˦˥˨˧˨˩˩˩ˀ˦]+$')
             if p in {'j', 'w'} and len(new_pron) and vowel_pattern.match(new_pron[-1]):
                 new_pron[-1] += p
+                continue
+            elif vowel_pattern.match(p) and len(new_pron) and vowel_pattern.match(new_pron[-1]):
+                new_pron[-1] += p
+                continue
+            elif p in {'ɗ','ɓ'} and len(new_pron) and new_pron[-1] == 'ʔ':
+                new_pron[-1] = p
+                continue
+            elif p == 'ʔ' and len(new_pron) and tone_pattern.match(new_pron[-1]) and not (i < len(phones) - 1 and phones[i + 1] in {'ɗ','ɓ'}):
+                new_pron[-1] += 'ˀ'
                 continue
         if lang in lang_mapping:
             for k, v in lang_mapping[lang].items():
@@ -960,10 +1288,13 @@ def convert_language_specific(word, phones, lang):
         phones = new_pron
         new_pron = []
         tone_symbols = {'˥˩', '˦˥', '˧', '˨˩', '˩˩˦'}
+        vowel_set = {x for x in vowels[lang] }
+        vowel_set |= {x+y for x, y in itertools.product(vowels[lang],vowels[lang])}
+        vowel_set |= {x+y+z for x, y, z in itertools.product(vowels[lang],vowels[lang],vowels[lang])}
         for i, p in enumerate(phones):
             if p in tone_symbols:
                 for j in range(len(new_pron) - 1, 0, -1):
-                    if new_pron[j] in vowels[lang]:
+                    if new_pron[j] in vowel_set and new_pron[j] not in {'w', 'j'}:
                         new_pron[j] += tone_mapping[p]
                         break
             else:
@@ -980,21 +1311,27 @@ def convert_language_specific(word, phones, lang):
         new_pron = []
         vowel_pattern = re.compile(rf'^[{"".join(vowels[lang])}]+[wj]?$')
         tone_symbols = {'˦ˀ˥', '˧˦', '˧˧', '˧˨', '˧˩', '˨˩', '˦˧˥', '˦˩', '˧˧', '˧˨', '˨˩', '˨˩˦', '˦˥', '˨˩˨'}
+        tone_pattern = re.compile(r'^[˥˩˦˥˨˧˨˩˩˩ˀ˦]+$')
         for i, p in enumerate(phones):
-            if p in tone_symbols:
+            if tone_pattern.match(p):
                 for j in range(len(new_pron) - 1, 0, -1):
                     if vowel_pattern.match(new_pron[j]):
                         new_pron[j] += p
                         break
             else:
                 new_pron.append(p)
-    elif lang == 'mandarin_hani':
+    elif lang.startswith('mandarin_hani'):
         mapping = {
             '²¹⁴': '˨˩˦',
             '⁵⁵': '˥˥',
             '³⁵': '˧˥',
             '⁵¹': '˥˩',
             '⁰': '',
+            '¹': '˩',
+            '²': '˨',
+            '³': '˨',
+            '⁴': '˦',
+            '⁵': '˥',
         }
         tone_symbols = {'²', '³', '¹', '⁴', '⁵', '⁰'}
         for i, p in enumerate(new_pron):
@@ -1002,20 +1339,30 @@ def convert_language_specific(word, phones, lang):
                 for k, v in mapping.items():
                     if k in new_pron[i]:
                         new_pron[i] = new_pron[i].replace(k, v)
-            if any(x in new_pron[i] for x in tone_symbols):
-                return None
+            #if any(x in new_pron[i] for x in tone_symbols):
+            #    return None
     elif lang == 'swedish':
         for i, p in enumerate(new_pron):
             if p == 'êː':
                 new_pron[i] = 'eː˧˩'
+            elif p == 'â':
+                new_pron[i] = 'a˧˩'
             elif p == 'ɛ̂':
                 new_pron[i] = 'ɛ˧˩'
+            elif p == 'ɑ̂ː':
+                new_pron[i] = 'ɑː˧˩'
+            elif p == 'ûː':
+                new_pron[i] = 'uː˧˩'
+            elif p == 'ʉ̂ː':
+                new_pron[i] = 'ʉː˧˩'
             elif p == 'ɵ̂':
                 new_pron[i] = 'ɵ˧˩'
             elif p == 'ʉ̂ː':
                 new_pron[i] = 'ʉː˧˩'
             elif p == 'ʉ̟ː˥˩':
                 new_pron[i] = 'ʉː˥˩'
+            elif p == 'ǎ':
+                new_pron[i] = 'a˥˧'
             elif p == 'ʉ̟ː˧˩':
                 new_pron[i] = 'ʉː˧˩'
             elif p == 'ø̀ː':
@@ -1134,12 +1481,7 @@ def convert_second_round(word, phones, lang):
     return new_pron
 
 def check_language_specific(word, phones, lang):
-    odd_set = {'ɯ̟ᵝ',
-               'ɰᵝ',
-               'ɰ̃',
-               'ɯ̟̊ᵝ',
-               'ɯ̟ᵝː',
-               'ɯ̟̃ᵝ', }
+    odd_set = set()
     if odd_set & set(phones):
         print(word)
         print(phones)
@@ -1181,6 +1523,12 @@ def process_language(lang):
         dictionary.extend(d)
         input_graphemes.update(g)
         input_phones.update(p)
+        word_set = {x[0] for x in dictionary}
+        d, g, p = read_source(lang)
+        dictionary.extend([x for x in d if x[0] not in word_set])
+        input_graphemes.update(g)
+        input_phones.update(p)
+
     else:
         dictionary, input_graphemes, input_phones = read_source(lang)
 

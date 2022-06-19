@@ -35,21 +35,28 @@ def split(s, indices):
     return [s[i:j] for i,j in zip(indices, indices[1:]+[None])]
 
 languages = [
-    #'bulgarian','german',
-    #'french','portuguese','serbian','swedish','tamil','thai','turkish',
-    #         'ukrainian', 'vietnamese', 'swahili', 'spanish', 'polish', 'czech',
+    'bulgarian',
+    # 'german',
+    #'french','portuguese',
+    'serbian', #'swedish','tamil',
+     'turkish',
+             'ukrainian',
+             'vietnamese',
+             'swahili',
+    #         'spanish', 'polish', 'czech',
      #'english',
-     #'russian',
-     #'hausa',
-     'arabic',
-     #'japanese',
-    #'thai',
-    #'mandarin_china', 'mandarin_taiwan'
+     'russian',
+     'hausa',
+     #'arabic',
+     'japanese',
+    'thai',
+    'mandarin_china',
+    'mandarin_taiwan'
 ]
 root_directory = r'/mnt/d/data/speech/CommonVoice'
 
 
-partitions = ['dev', 'test', 'train', 'validated']
+partitions = ['validated', 'other']
 
 
 bad_chars = {'，', '。', '、', '「', '」','・・・',  '。', '：', ' ', '-','--', '──', '─', '）', '（', '――', '───', '……',
@@ -65,6 +72,16 @@ for lang in languages:
     speaker_counts = Counter()
     count = 0
     speaker_information = {}
+    bad_files = set()
+    bad_sentences = set()
+    with open(os.path.join(lang_dir, 'invalidated.tsv'), 'r', encoding='utf8') as f:
+        reader = csv.DictReader(f, delimiter='\t', quotechar='"')
+        for line in reader:
+            bad_files.add(line['path'])
+    with open(os.path.join(lang_dir, 'reported.tsv'), 'r', encoding='utf8') as f:
+        reader = csv.DictReader(f, delimiter='\t', quotechar='"')
+        for line in reader:
+            bad_sentences.add(line['sentence'])
     if lang == 'thai':
         session = tf.Session()
         model = tf.saved_model.loader.load(session, [tf.saved_model.tag_constants.SERVING], saved_model_path)
@@ -85,6 +102,16 @@ for lang in languages:
             for line in reader:
                 speaker = line['client_id']
                 path = line['path']
+                text = line['sentence']
+                if path in bad_files or text in bad_sentences:
+                    mp3_path = os.path.join(lang_dir, speaker, path)
+                    if os.path.exists(mp3_path):
+                        os.remove(mp3_path)
+                    if os.path.exists(mp3_path.replace('.mp3', '.lab')):
+                        os.remove(mp3_path.replace('.mp3', '.lab'))
+                    continue
+                if text in bad_sentences:
+                    continue
                 if speaker not in speaker_information:
                     speaker_information[speaker] = {
                         'age': line['age'],
@@ -93,7 +120,6 @@ for lang in languages:
                         'locale': line['locale'],
                     }
                 if path not in clip_info and not os.path.exists(os.path.join(lang_dir, speaker, path)):
-                    text = line['sentence']
                     if lang == 'japanese':
                         words = nagisa.tagging(text)
                         new_words = []
@@ -177,6 +203,8 @@ for lang in languages:
         text = v['text']
         mp3_path = k
         lab_path = k.replace('.mp3', '.lab')
+        if os.path.exists(os.path.join(out_dir, lab_path)):
+            continue
         if os.path.exists(clip_dir) and os.path.exists(os.path.join(clip_dir, mp3_path)):
             os.rename(os.path.join(clip_dir, mp3_path), os.path.join(out_dir, mp3_path))
         with open(os.path.join(out_dir, lab_path), 'w', encoding='utf8') as f:

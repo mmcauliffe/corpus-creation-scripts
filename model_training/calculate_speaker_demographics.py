@@ -1,8 +1,23 @@
 import collections
 import os
-import librosa
 
-include_languages = {'swedish', 'czech'}
+include_languages = {'bulgarian',
+    # 'german',
+    #'french','portuguese',
+    #'croatian', #'swedish','tamil',
+    # 'turkish',
+            # 'ukrainian',
+            # 'vietnamese',
+            # 'swahili',
+    #         'spanish', 'polish', 'czech',
+     #'english',
+     #'russian',
+     #'hausa',
+     #'arabic',
+     'japanese',
+    #'thai',
+    #'mandarin',
+                     }
 
 root_dir = '/mnt/d/Data/speech/model_training_corpora'
 
@@ -13,6 +28,8 @@ for lang in os.listdir(root_dir):
     lang_dir = os.path.join(root_dir, lang)
     for corpus in os.listdir(lang_dir):
             if corpus.endswith('_temp'):
+                continue
+            if 'common' not in corpus:
                 continue
             corpus_dir = os.path.join(lang_dir, corpus)
             if not os.path.isdir(corpus_dir):
@@ -44,7 +61,5 @@ for lang in os.listdir(root_dir):
                                 continue
                             duration = librosa.get_duration(filename=os.path.join(speaker_directory, file))
                             corpus_gender_durations[gender] += duration
-            print(corpus)
-            print(corpus_gender_counts)
-            print(corpus_gender_durations)
+            print(corpus, corpus_gender_counts)
 

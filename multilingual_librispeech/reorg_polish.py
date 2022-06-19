@@ -1,8 +1,9 @@
 import os
 
 
-mls_root = '/mnt/d/Data/speech/multilingual_librispeech'
-polish_directory = os.path.join(mls_root, 'mls_polish')
+mls_root = 'D:/Data/speech/multilingual_librispeech'
+polish_directory = os.path.join(mls_root, 'mls_polish_opus')
+output_directory = os.path.join(mls_root, 'mls_polish')
 
 
 for folder in ['dev', 'test', 'train']:
@@ -18,6 +19,15 @@ for folder in ['dev', 'test', 'train']:
                 continue
             utterance, text = line.split(maxsplit=1)
             transcripts[utterance] = text
+            s = utterance.split('_')
+            new_speaker = s[0] + "_" + s[1]
+            new_speaker_dir = os.path.join(output_directory, new_speaker)
+            lab_path = os.path.join(new_speaker_dir, utterance + '.lab')
+            if not os.path.exists(lab_path):
+                with open(lab_path, 'w', encoding='utf8') as f:
+                    f.write(transcripts[utterance])
+
+    break
     audio_dir = os.path.join(folder_path, 'audio')
     for speaker in os.listdir(audio_dir):
         speaker_dir = os.path.join(audio_dir, speaker)

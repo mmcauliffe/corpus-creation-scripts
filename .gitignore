@@ -131,3 +131,9 @@ dmypy.json
 .pyre/
 
 .idea/
+
+*.tsv
+
+*.txt
+
+*.dict

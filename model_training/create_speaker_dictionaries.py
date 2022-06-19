@@ -4,18 +4,19 @@ import sys
 import subprocess
 import yaml
 from montreal_forced_aligner.corpus.acoustic_corpus import AcousticCorpus
+from montreal_forced_aligner.db import Speaker
 
 if sys.platform == 'win32':
     training_root = r'D:/Data/speech/model_training_corpora'
-    dictionary_dir = r'C:/Users/michael/Documents/Dev/mfa-models/dictionary/staging'
+    dictionary_dir = r'C:/Users/michael/Documents/Dev/mfa-models/dictionary/training'
 else:
     training_root = r'/mnt/d/Data/speech/model_training_corpora'
-    dictionary_dir = r'/mnt/c/Users/michael/Documents/Dev/mfa-models/dictionary/staging'
+    dictionary_dir = r'/mnt/c/Users/michael/Documents/Dev/mfa-models/dictionary/training'
 
-languages = ['bulgarian', 'french', 'german', 'portuguese', 'polish', 'turkish',
+languages = ['bulgarian', 'english', 'french', 'german', 'portuguese', 'polish', 'turkish',
              'croatian', 'swedish', 'korean', 'thai', 'mandarin', 'tamil',
              'czech', 'japanese', 'vietnamese', 'ukrainian', 'swahili', 'spanish',
-             'russian', 'hausa', 'english']
+             'russian', 'hausa']
 
 dialect_dictionary_mapping = {
     'Northern Vietnam': os.path.join(dictionary_dir, 'vietnamese_hanoi_mfa.dict'),
@@ -127,6 +128,8 @@ def combine_dictionaries(lang, out_path):
 
 
 for lang in languages:
+    if lang == 'japanese':
+        continue
     print(lang)
     language_root = os.path.join(training_root, lang)
     default_dictionary_path = os.path.join(dictionary_dir, f'{lang}_mfa.dict')
@@ -189,7 +192,9 @@ for lang in languages:
                                     temporary_directory=os.path.join(language_root, f'{corpus}_dictionary_temp'))
             corpus._load_corpus()
             corpus_speaker_dicts = {}
-            for speaker in corpus._speaker_ids.keys():
+            with corpus.session() as session:
+                speakers = session.query(Speaker.name)
+            for speaker, in speakers:
                 speaker_dictionary_mapping[speaker] = corpus_default_dict
                 corpus_speaker_dicts[speaker] = corpus_default_dict
             with open(yaml_file, 'w', encoding='utf8') as f:

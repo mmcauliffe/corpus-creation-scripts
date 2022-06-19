@@ -4,17 +4,22 @@ import re
 
 import hanziconv
 import hangul_jamo
+import pykakasi
 import itertools
 from montreal_forced_aligner.command_line.g2p import run_g2p
 
 training_root = '/mnt/d/Data/speech/model_training_corpora'
 g2p_model_dir = r'/mnt/c/Users/michael/Documents/Dev/mfa-models/g2p/staging'
 
+kks = pykakasi.kakasi()
 
-languages = ['japanese', 'bulgarian', 'french', 'german', 'portuguese',
-             'croatian', 'swedish', 'korean', 'thai', 'mandarin',
+languages = [
+    'japanese', 'bulgarian', 'french', 'german', 'portuguese',
+             'croatian', 'swedish', 'korean', 'thai',
+             'mandarin',
              'hausa', 'russian', 'spanish', 'english', 'vietnamese',
-             'turkish', 'swahili', 'polish','czech','ukrainian']
+             'turkish', 'swahili', 'polish','czech','ukrainian'
+             ]
 
 class DefaultArgs:
     def __init__(self, input_path, g2p_model_path, output_path, temporary_directory):
@@ -40,9 +45,9 @@ models = {
                    'vietnamese_hue_mfa.zip'],
 }
 chinese_ipa_mapping_files = {
-    'mandarin_china': r"/mnt/d/Data/speech/dictionaries/wikipron/cleaned/mandarin_hani_standard.txt",
-    'mandarin_erhua': r"/mnt/d/Data/speech/dictionaries/wikipron/cleaned/mandarin_hani_beijing.txt",
-    'mandarin_taiwan': r"/mnt/d/Data/speech/dictionaries/wikipron/cleaned/mandarin_hani_taiwan.txt",
+    'mandarin_china': r"/mnt/c/Users/michael/Documents/Dev/mfa-models/dictionary/training/mandarin_china_mfa.dict",
+    'mandarin_erhua': r"/mnt/c/Users/michael/Documents/Dev/mfa-models/dictionary/training/mandarin_erhua_mfa.dict",
+    'mandarin_taiwan': r"/mnt/c/Users/michael/Documents/Dev/mfa-models/dictionary/training/mandarin_taiwan_mfa.dict",
 }
 
 chinese_ipa_mapping = {}
@@ -148,7 +153,7 @@ def load_oov_counts(input_path):
 
 def save_oov_file(counter, output_path, count_threshold=2):
     with open(output_path, 'w', encoding='utf8') as outf:
-        for word, count in counter.items():
+        for word, count in sorted(counter.items(), key=lambda x: -x[1]):
             if count_threshold and count < count_threshold:
                 break
             outf.write(word + '\n')
@@ -187,7 +192,7 @@ if __name__ == '__main__':
             for corpus in os.listdir(language_root):
                 for dialect, mapping in chinese_ipa_mapping.items():
                     g2pped_file = os.path.join(language_root, f'{corpus}_{dialect}.g2pped')
-                    oov_file = os.path.join(validation_temporary_directory, corpus, f'{corpus}_validate_training', f'oov_counts_{dialect}_ipa.txt')
+                    oov_file = os.path.join(validation_temporary_directory, corpus, f'{corpus}_validate_training', f'oov_counts_{dialect}_mfa.txt')
                     print(oov_file)
                     if not os.path.exists(oov_file):
                         continue
@@ -297,7 +302,7 @@ if __name__ == '__main__':
                 oov_counter.update(load_oov_counts(oov_file))
             if not oov_counter:
                 continue
-            save_oov_file(oov_counter, to_g2p_file)
+            save_oov_file(oov_counter, to_g2p_file, 1)
             #process_oov_counts(oov_file, to_g2p_file)
             if not os.path.exists(to_g2p_file):
                 continue
@@ -305,9 +310,7 @@ if __name__ == '__main__':
                 if 'jamo' not in model_path:
                     model_path = model_path.replace('_mfa.zip', '_jamo_mfa.zip')
             args = DefaultArgs(to_g2p_file, model_path, g2pped_file, os.path.join(g2p_temporary_directory,lang + '_g2p'))
-            if False and os.path.exists(args.output_path):
-                continue
-            if lang != 'mandarin':
+            if lang != 'mandarin' and not os.path.exists(args.output_path):
                 run_g2p(args)
             if lang == 'korean':
                 words = []

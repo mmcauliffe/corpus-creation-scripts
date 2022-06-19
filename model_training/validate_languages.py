@@ -2,14 +2,16 @@ import os
 import subprocess
 
 training_root = '/mnt/d/Data/speech/model_training_corpora'
-dictionary_dir = '/mnt/c/Users/michael/Documents/Dev/mfa-models/dictionary/staging'
+dictionary_dir = '/mnt/c/Users/michael/Documents/Dev/mfa-models/dictionary/training'
 
 languages = ['english', 'korean', 'bulgarian', 'french', 'german', 'portuguese', 'polish', 'turkish',
              'croatian', 'swedish', 'thai', 'mandarin', 'tamil',
              'czech', 'japanese', 'vietnamese', 'ukrainian', 'swahili', 'spanish',
              'swedish',
              'russian', 'hausa', ]
-
+languages = [
+     'japanese',
+]
 
 class DefaultArgs:
     def __init__(self, corpus_directory, temp_dir):
@@ -31,10 +33,14 @@ class DefaultArgs:
 
 skip_corpora = {'librispeech_en'}
 
-skip_languages = {'french', 'german', 'czech', 'korean', 'english'}
+skip_languages = {
+    #'french', 'german', 'korean', 'english'
+}
 
 if __name__ == '__main__':
     for lang in languages:
+        #if lang != 'mandarin':
+        #    continue
         if lang in skip_languages:
             continue
         language_root = os.path.join(training_root, lang)
@@ -43,10 +49,8 @@ if __name__ == '__main__':
         temporary_directory = os.path.join(language_root, 'validation_temp')
         for corpus in os.listdir(language_root):
             print(corpus)
-            if 'common' in corpus:
-                continue
-            if 'globalphone' in corpus:
-                continue
+            #if 'common' not in corpus:
+            #    continue
             if corpus.endswith('_temp'):
                 continue
             if not os.path.isdir(os.path.join(language_root, corpus)):

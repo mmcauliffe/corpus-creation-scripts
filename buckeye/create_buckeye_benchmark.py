@@ -61,19 +61,19 @@ def load_file(path, max_time):
             label = m.group("label")
             label = label.replace(" ", "_")
             if '<NOISE-' in label.upper() and '_' not in label:
-                label = label.replace('<NOISE-', '')[:-1]
+                label = label.lower().replace('<noise-', '')[:-1]
             elif '<NOSIE-' in label.upper() and '_' not in label:
                 label = label.replace('<NOSIE-', '')[:-1]
             elif '<LAUH-' in label.upper() and '_' not in label:
                 label = '<LAUGH>'
             elif '<VOCNOISE-' in label.upper():
-                label = label.replace('<VOCNOISE-', '')[:-1]
+                label = label.lower().replace('<vocnoise-', '')[:-1]
             elif '<EXT-' in label.upper() and '_' not in label:
-                label = label.replace('<EXT-', '')[:-1]
+                label = label.lower().replace('<ext-', '')[:-1]
             elif label.upper().startswith('<CUTOFF'):
                 label = "<CUTOFF>"
             elif label.upper().startswith('<HES') and '_' not in label:
-                label = label.replace('<HES-', '')[:-1]
+                label = label.lower().replace('<hes-', '')[:-1]
             elif label.upper().startswith('<IVER'):
                 label = ''
             elif line_type == 'phones' and 'IVER' in label.upper():
@@ -85,7 +85,7 @@ def load_file(path, max_time):
             elif label.upper().startswith('<EXCLUDE-'):
                 label = '<EXCLUDE>'
             elif label.upper().startswith('<EXCL-') and '_' not in label:
-                label = label.replace('<EXCL-', '')[:-1]
+                label = label.lower().replace('<excl-', '')[:-1]
             elif label.upper().startswith('<UNKNOWN'):
                 label = '<UNKNOWN>'
             elif label.upper().startswith('<ERROR'):
