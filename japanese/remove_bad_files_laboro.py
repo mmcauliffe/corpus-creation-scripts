@@ -1,5 +1,8 @@
 import os
 import shutil
+
+import tqdm
+
 root_dir = r"D:\Data\speech\japanese_corpora\LaboroTVSpeech"
 
 bad_file_path = r"D:\Data\speech\japanese_corpora\bad_files.txt"
@@ -12,10 +15,13 @@ with open(bad_file_path, 'r') as f:
             continue
         bad_files.add(line)
 
-for file in bad_files:
-    if file.startswith("MSLT") or file.startswith('common_voice'):
+for speaker in tqdm.tqdm(os.listdir(root_dir)):
+    if speaker.startswith('.'):
         continue
-    directory = os.path.join(root_dir, file)
-    if os.path.exists(directory):
-        print(file)
-        shutil.rmtree(directory)
+    speaker_dir = os.path.join(root_dir, speaker)
+    if len(os.listdir(speaker_dir)) == 0:
+        os.removedirs(speaker_dir)
+        continue
+    for f in os.listdir(speaker_dir):
+        if f.split('.')[0] in bad_files:
+            os.remove(os.path.join(speaker_dir, f))

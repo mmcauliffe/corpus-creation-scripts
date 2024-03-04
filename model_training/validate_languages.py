@@ -1,8 +1,9 @@
 import os
-import subprocess
+from montreal_forced_aligner.command_line.mfa import mfa_cli
 
-training_root = '/mnt/d/Data/speech/model_training_corpora'
-dictionary_dir = '/mnt/c/Users/michael/Documents/Dev/mfa-models/dictionary/training'
+training_root = 'D:/Data/speech/model_training_corpora'
+temp_root = 'D:/temp/validation'
+dictionary_dir = 'C:/Users/michael/Documents/Dev/mfa-models/dictionary/training'
 
 languages = ['english', 'korean', 'bulgarian', 'french', 'german', 'portuguese', 'polish', 'turkish',
              'croatian', 'swedish', 'thai', 'mandarin', 'tamil',
@@ -10,7 +11,8 @@ languages = ['english', 'korean', 'bulgarian', 'french', 'german', 'portuguese',
              'swedish',
              'russian', 'hausa', ]
 languages = [
-     'japanese',
+     #'hindi-urdu', 'tamil'
+    'english',
 ]
 
 class DefaultArgs:
@@ -31,7 +33,8 @@ class DefaultArgs:
         self.audio_directory = None
         self.phone_set_type = 'IPA'
 
-skip_corpora = {'librispeech_en'}
+skip_corpora = {'librispeech_english', 'common_voice_english','coraal','google_uk_ireland',
+                'google_nigeria','aru_english','nchlt_english'}
 
 skip_languages = {
     #'french', 'german', 'korean', 'english'
@@ -46,11 +49,11 @@ if __name__ == '__main__':
         language_root = os.path.join(training_root, lang)
         dictionary_path = os.path.join(language_root, f"{lang}_speaker_dictionaries.yaml")
 
-        temporary_directory = os.path.join(language_root, 'validation_temp')
+        temporary_directory = os.path.join(temp_root, f'validation_temp_{lang}')
         for corpus in os.listdir(language_root):
             print(corpus)
-            #if 'common' not in corpus:
-            #    continue
+            if corpus in skip_corpora:
+                continue
             if corpus.endswith('_temp'):
                 continue
             if not os.path.isdir(os.path.join(language_root, corpus)):
@@ -60,13 +63,12 @@ if __name__ == '__main__':
             out_dir = os.path.join(temporary_directory, corpus)
             if os.path.exists(out_dir):
                 continue
-            args = DefaultArgs(corpus_dir, out_dir)
             config_path = os.path.join(language_root, lang + '.yaml')
-            command = ['mfa', 'validate', corpus_dir, dictionary_path,
-                                   '-t', out_dir, '-j', '10', '--clean',
+            command = ['validate', corpus_dir, dictionary_path,
+                                   '-t', out_dir, '-j', '2', '--clean',
                                    '--ignore_acoustics', '--phone_set_type', 'IPA']
             if os.path.exists(config_path):
                 command.extend(['--config_path', config_path])
             print(command)
-            subprocess.call(command)
+            mfa_cli(command, standalone_mode=False)
         #break

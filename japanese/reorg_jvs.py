@@ -1,7 +1,7 @@
 import os
-import nagisa
+#import nagisa
 
-corpus_root = '/mnt/d/Data/speech/japanese_corpora/jvs_ver1'
+corpus_root = r'D:\Data\speech\japanese_corpora\jvs_ver1'
 
 styles = ['falset10', 'nonpara30', 'parallel100', 'whisper10']
 
@@ -15,6 +15,15 @@ for speaker in os.listdir(corpus_root):
     if not os.path.isdir(speaker_dir):
         continue
     texts = {}
+    for file in os.listdir(speaker_dir):
+        if not file.endswith('.wav') and not file.endswith('.lab'):
+            continue
+        p = file.split('_')
+        new_speaker = '_'.join(p[:2])
+        new_speaker_dir = os.path.join(speaker_dir, new_speaker)
+        os.makedirs(new_speaker_dir, exist_ok=True)
+        os.rename(os.path.join(speaker_dir, file), os.path.join(new_speaker_dir, file))
+    continue
     for style in styles:
         transcript_path = os.path.join(speaker_dir, style, 'transcripts_utf8.txt')
         wav_folder = os.path.join(speaker_dir, style, 'wav24kHz16bit')

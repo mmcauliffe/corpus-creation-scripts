@@ -16,7 +16,7 @@ lang_codes = ['bulgarian', 'croatian', 'czech', 'french', 'german', 'mandarin_ha
               'tamil', 'thai', 'turkish', 'ukrainian', 'mandarin_hani_beijing', 'mandarin_hani_taiwan', 'mandarin_hani_standard',
               'korean_hangul', 'hausa', 'japanese', 'vietnamese_hanoi', 'vietnamese_hue', 'vietnamese_hochiminhcity']
 lang_codes = ['russian']
-# lang_codes = ['hausa']
+lang_codes = ['hausa']
 
 bad_graphemes = {
     'english_us': {'%', '/', '@', '²', 'à', 'á', 'â', 'ä', 'æ', 'ç', 'è', 'é', 'ê', 'ë', 'í', 'î', 'ï', 'ñ', 'ó', 'ô',
@@ -174,7 +174,7 @@ def read_source(lang):
     return dictionary, graphemes, phones
 
 
-bad_phones = {'english_uk': {'ɪː','aː', 'eː', 'a', 'o', 'oː', 'eː', 'e'},
+bad_phones = {'english_uk': {'ɪː', 'aː', 'eː', 'a', 'o', 'oː', 'eː', 'e'},
               'english_us': {'ɒ', 'aː', 'a', 'o', 'oː', 'eː', 'e', 'ɪː', 'ɛː'},
 
               'german': {'ʊɪ'},
@@ -265,7 +265,6 @@ def save_dictionary(dictionary, lang):
                 deduplication.add((w, p))
     print("Final phones:", sorted(final_phones))
     print("Final phone counts:", sorted(final_phones.items(), key=lambda x: -x[1]))
-
 
 lang_mapping = {
     'bulgarian': {

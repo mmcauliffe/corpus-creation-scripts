@@ -20,6 +20,7 @@ phone_line_pattern = re.compile(r"^(?P<time>[0-9.]+)  ?12[123] (?P<label>[-'_\w<
 
 typo_mapping = {
     'ynkow': 'yknow',
+    'controling': 'controlling',
     'ynknow': 'yknow',
     'aderal': 'adderall',
     'femalee': 'female',
@@ -98,10 +99,16 @@ def load_file(path, max_time):
                 label = 'there'
             elif label.lower() == '<thirty>':
                 label = ''
-            elif label.upper() in ['<VOCNOISE>', '<VOCNOISED>', 'VOCNOISE',
-                           '<SIL>', 'SIL',
-                           '<NOISE>', 'NOISE',
-                           '<IVER>', 'IVER',
+            elif line_type == 'words' and label.upper() in ['<VOCNOISE>', '<VOCNOISED>',
+                           '<SIL>',
+                           '<NOISE>',
+                           '<IVER>',
+                           ]:
+                label = ''
+            elif line_type == 'phones' and label.upper() in ['VOCNOISE',
+                            'SIL',
+                           'NOISE',
+                           'IVER',
                            ]:
                 label = ''
             if '=' in label:
@@ -157,31 +164,48 @@ def correct_phones(word_intervals, phone_intervals):
 def construct_phrases(word_intervals, max_time):
     data = []
     cur_utt = []
+    silence_padding = 0.2
     for i, w in enumerate(word_intervals):
         if cur_utt and i != 0:
-            if w.start - word_intervals[i-1].end > 0.15:
-                begin = cur_utt[0].start - 0.075
+            if w.start - word_intervals[i-1].end > silence_padding * 1.5 or \
+                    (w.start - word_intervals[i-1].end > silence_padding and cur_utt[-1].end - cur_utt[0].start > 10):
+                begin = cur_utt[0].start - silence_padding
                 if begin < 0:
                     begin = 0
-                end = cur_utt[-1].end + 0.075
+                end = cur_utt[-1].end + silence_padding
                 if end > max_time:
                     end = max_time
                 label = ' '.join(x.label for x in cur_utt)
+
+                if data and data[-1].end > begin:
+                    begin = (data[-1].end + begin) / 2
+                    data[-1] = Interval(data[-1].start, begin, data[-1].label)
                 data.append(Interval(begin, end, label))
                 cur_utt = []
         cur_utt.append(w)
     if cur_utt:
-        begin = cur_utt[0].start - 0.075
+        begin = cur_utt[0].start - silence_padding
         if begin < 0:
             begin = 0
-        end = cur_utt[-1].end + 0.075
+        end = cur_utt[-1].end + silence_padding
         if end > max_time:
             end = max_time
         label = ' '.join(x.label for x in cur_utt)
+        if data and data[-1].end > begin:
+            begin = (data[-1].end + begin) / 2
+            data[-1] = Interval(data[-1].start, begin, data[-1].label)
         data.append(Interval(begin, end, label))
 
-    skip_labels = {'<EXCLUDE>', '<CUTOFF>'}
-    data = [x for x in data if x.end - x.start > 0.1 and x.label not in skip_labels]
+    skip_labels = {'<exclude>', '<cutoff>', '<unknown>', '<laugh>'}
+    data = [x for x in data if x.end - x.start > 0.5 + (silence_padding *2) and
+            not all(y in skip_labels for y in x.label.lower().split())
+            and x.label not in {'oh', 'uh', 'ah', 'um', 'a', 'uh-oh', 'yeah', 'no', 'okay',
+                                'or', 'eh', 'hum', 'aw', 'wow', "it's", 'people', 'or', "i'm",
+                                "there", 'and', 'my', 'i', 'right', 'duh', 'fine', 'oh yeah',
+                                'what', 'so', 'huh', 'hm', 'the', 'mm', 'really', 'umhum', 'and uh',
+                                'um hum', 'um-hum', 'um-hum um-hum', 'uh-huh', 'uh huh', 'but', 'my', 'ima', 'uh uh', 'whoa',
+                                'this', 'yeah um',
+                                'we', 'you', 'mm-hmm', 'yknow', 'sure', 'now', 'i uh'}]
 
     return data
 
@@ -225,7 +249,6 @@ for speaker in speakers:
     for file_name in files:
         print(file_name)
         utterances = construct_phrases(files[file_name]['words'], durations[file_name])
-
         output_path = os.path.join(bench_out_dir, f"{file_name}.TextGrid")
         tg = tgio.Textgrid(maxTimestamp=durations[file_name])
         tier = tgio.IntervalTier(speaker, utterances, minT=0, maxT=durations[file_name])

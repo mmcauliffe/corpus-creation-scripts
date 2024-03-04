@@ -1,10 +1,11 @@
 import collections
 import os
 
-include_languages = {'bulgarian',
+include_languages = {#'bulgarian',
     # 'german',
     #'french','portuguese',
-    #'croatian', #'swedish','tamil',
+    #'croatian',
+                     #'swedish','tamil',
     # 'turkish',
             # 'ukrainian',
             # 'vietnamese',
@@ -19,7 +20,7 @@ include_languages = {'bulgarian',
     #'mandarin',
                      }
 
-root_dir = '/mnt/d/Data/speech/model_training_corpora'
+root_dir = 'D:/Data/speech/model_training_corpora'
 
 for lang in os.listdir(root_dir):
     if lang not in include_languages:
@@ -29,8 +30,8 @@ for lang in os.listdir(root_dir):
     for corpus in os.listdir(lang_dir):
             if corpus.endswith('_temp'):
                 continue
-            if 'common' not in corpus:
-                continue
+            #if 'common' not in corpus:
+            #    continue
             corpus_dir = os.path.join(lang_dir, corpus)
             if not os.path.isdir(corpus_dir):
                 continue
