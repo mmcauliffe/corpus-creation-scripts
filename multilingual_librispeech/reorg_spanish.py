@@ -1,12 +1,10 @@
 import os
 
 
-mls_root = '/mnt/d/Data/speech/multilingual_librispeech'
-polish_directory = os.path.join(mls_root, 'mls_spanish')
-
+spanish_directory = 'D:\Data\speech\model_training_corpora\spanish\mls_spanish'
 
 for folder in ['dev', 'test', 'train']:
-    folder_path = os.path.join(polish_directory, folder)
+    folder_path = os.path.join(spanish_directory, folder)
     if not os.path.exists(folder_path):
         continue
     transcripts = {}
@@ -21,7 +19,7 @@ for folder in ['dev', 'test', 'train']:
     audio_dir = os.path.join(folder_path, 'audio')
     for speaker in os.listdir(audio_dir):
         speaker_dir = os.path.join(audio_dir, speaker)
-        output_speaker_dir = os.path.join(polish_directory, speaker)
+        output_speaker_dir = os.path.join(spanish_directory, speaker)
         os.makedirs(output_speaker_dir, exist_ok=True)
         for sub_dir in os.listdir(speaker_dir):
             for file in os.listdir(os.path.join(speaker_dir, sub_dir)):

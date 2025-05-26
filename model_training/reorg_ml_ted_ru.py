@@ -3,10 +3,13 @@ import soundfile
 from praatio.utilities.constants import Interval
 from praatio.textgrid import Textgrid, IntervalTier
 
-root_dir = r"D:\Data\speech\multilingual_tedx\mtedx_ru\ru-ru\data"
+root_dir = r"D:/Data/speech/mtedx_ru/ru-ru/data"
+output_dir = r"D:/Data/speech/mtedx_ru"
 
 for p in ['test', 'train', 'valid']:
     audio_dir = os.path.join(root_dir, p, 'wav')
+    for file in os.listdir(audio_dir):
+        os.rename(os.path.join(audio_dir, file), os.path.join(output_dir, file))
     segments_file = os.path.join(root_dir, p, 'txt', 'segments')
     transcript_file = os.path.join(root_dir, p, 'txt', f'{p}.ru')
     transcripts = []
@@ -24,12 +27,12 @@ for p in ['test', 'train', 'valid']:
             if file not in intervals:
                 intervals[file] = []
             if intervals[file] and begin < intervals[file][-1].end:
-                intervals[file][-1] = Interval(intervals[file][-1].start, end, intervals[file][-1].label + " "+  transcripts[i])
+                intervals[file][-1] = Interval(intervals[file][-1].start, end, intervals[file][-1].label + " "+ transcripts[i])
                 continue
             intervals[file].append(Interval(begin, end, transcripts[i]))
     for file, interval_list in intervals.items():
-        wav_path = os.path.join(audio_dir, f'{file}.flac')
-        tg_path = os.path.join(audio_dir, f'{file}.TextGrid')
+        wav_path = os.path.join(output_dir, f'{file}.flac')
+        tg_path = os.path.join(output_dir, f'{file}.TextGrid')
         info = soundfile.info(wav_path)
         duration = info.duration
         tg = Textgrid(minTimestamp=0, maxTimestamp=duration)

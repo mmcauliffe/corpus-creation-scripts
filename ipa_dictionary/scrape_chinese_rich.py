@@ -61,6 +61,8 @@ pos_sections = {'Verb', 'Adjective', 'Proper noun', 'Adnominal', 'Preposition',
                 'Noun', 'Pronoun', 'Adverb','Interjection', 'Particle', 'Numeral', 'Counter', 'Conjunction',
                 'Determiner', 'Postposition', "Letter", 'Classifier'}
 morphological_sections = {'Suffix', 'Prefix','Clitic'}
+
+
 def _scrape_word(word:str):
     session = requests_html.HTMLSession()
     request = session.get(

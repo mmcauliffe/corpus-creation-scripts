@@ -6,7 +6,7 @@ import re
 import sys
 import tqdm
 from collections import Counter
-import hanziconv
+#import hanziconv
 ignore = []
 
 def nonzero(a):
@@ -39,7 +39,7 @@ languages = [
     'mandarin_china',
     'mandarin_taiwan'
 ]
-languages = ['german']
+languages = ['czech',]
 
 if sys.platform == 'win32':
     root_directory = r'D:\Data\speech\model_training_corpora'
@@ -59,10 +59,10 @@ for lang in languages:
         print("IGNORING", lang)
         continue
     root_lang = lang
-    if lang in ['hindi', 'urdu']:
-        root_lang = 'hindi-urdu'
-    elif lang in ['mandarin_china', 'mandarin_taiwan']:
+    if lang in ['mandarin_china', 'mandarin_taiwan']:
         root_lang = 'mandarin'
+    if lang in ['serbian']:
+        root_lang = 'serbo-croatian'
     lang_dir = os.path.join(root_directory, root_lang, 'common_voice_{}'.format(lang))
     if not os.path.exists(lang_dir):
         print("IGNORING", lang)
@@ -80,6 +80,7 @@ for lang in languages:
         for line in reader:
             bad_files.add(line['path'])
     with open(os.path.join(lang_dir, 'other.tsv'), 'r', encoding='utf8') as f:
+        reader = csv.DictReader(f, delimiter='\t', quotechar='|')
         reader = csv.DictReader(f, delimiter='\t', quotechar='|')
         for line in reader:
             bad_files.add(line['path'])

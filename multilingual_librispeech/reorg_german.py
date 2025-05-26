@@ -1,9 +1,23 @@
 import os
+import subprocess
+
+mls_root = r'D:\Data\speech\model_training_corpora\german\mls_german'
 
 
-mls_root = '/mnt/d/Data/speech/multilingual_librispeech'
-polish_directory = os.path.join(mls_root, 'mls_german')
+for root, _, files in os.walk(mls_root, followlinks=True):
+    for f in files:
+        if not f.endswith('.opus'):
+            continue
+        path = os.path.join(root, f)
+        flac_path = path.replace('.opus', '.flac')
+        if os.path.exists(flac_path):
+            os.remove(flac_path)
+        command = ['ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-nostats', '-i', path,
+                   '-c:a', 'flac', flac_path]
+        subprocess.check_call(command)
+        os.remove(path)
 
+error
 
 for folder in ['dev', 'test', 'train']:
     folder_path = os.path.join(polish_directory, folder)
